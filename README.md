@@ -30,11 +30,13 @@ Satu alat automasi berkuasa tinggi untuk menukar model **LoRA/MLX** kepada forma
    ```bash
    git clone https://github.com/N4Z1T/mlx-to-ollama.git
    cd mlx-to-ollama
+   
+   git clone https://github.com/ggerganov/llama.cpp
    ```
 
 2. **Sediakan Persekitaran Python**:
    ```bash
-   conda create -n mlx_env python=3.10
+   conda create -n mlx_env python=3.10 -y
    conda activate mlx_env
    pip install mlx_lm huggingface_hub numpy streamlit
    ```
