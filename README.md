@@ -50,6 +50,10 @@ Satu alat automasi berkuasa tinggi untuk menukar model **LoRA/MLX** kepada forma
    GGUF_OUT="/path/to/output/model.gguf"
    QUANT_METHOD="Q4_K_M"
    ```
+4. **Log Masuk Hugging Face (Penting!):**
+   ```bash
+   huggingface-cli login
+   ```
 
 ---
 
