@@ -45,19 +45,62 @@ echo "=========================================="
 echo "🚀 MEMULAKAN PROSES AUTOMASI LLM"
 echo "=========================================="
 
+CURRENT_DIR=$(pwd)
+
 # --------------------------------------
-# 1. BACA .ENV & CLI OVERRIDE
+# 1. AUTO-SETUP WIZARD (JIKA .ENV TIADA)
 # --------------------------------------
-if [ -f .env ]; then
-    source .env
-    echo "✅ Fail .env berjaya dibaca."
-else
-    echo "❌ RALAT: Fail .env tidak dijumpai di folder ini!"
-    exit 1
+if [ ! -f .env ]; then
+    echo "⚠️ Fail .env tidak dijumpai!"
+    echo "🛠️ Melancarkan Setup Wizard... (Tekan ENTER untuk guna cadangan automatik)"
+    echo "--------------------------------------------------------"
+    
+    # 1. Minta Base Model secara manual
+    read -p "1. Base Model (HuggingFace) [meta-llama/Meta-Llama-3-8B-Instruct]: " input_base
+    BASE_MODEL=${input_base:-"meta-llama/Meta-Llama-3-8B-Instruct"}
+
+    # Ekstrak nama pendek Base Model (cth: ambil 'Meta-Llama-3-8B' dari 'meta-llama/Meta-Llama-3-8B')
+    SHORT_BASE=$(basename "$BASE_MODEL")
+
+    # Jana nama cadangan secara dinamik berdasarkan Base Model
+    DEFAULT_ADAPTER="${SHORT_BASE}_LoRA"
+    DEFAULT_SAVE="${SHORT_BASE}_Fused"
+    DEFAULT_GGUF="${SHORT_BASE}_Q4.gguf"
+
+    # 2. Tanya nama Adapter, Fused & GGUF dengan cadangan pintar
+    read -p "2. Nama folder Adapter LoRA (di direktori ini) [$DEFAULT_ADAPTER]: " input_adapter
+    ADAPTER_NAME=${input_adapter:-"$DEFAULT_ADAPTER"}
+    
+    read -p "3. Nama folder Fused Model output [$DEFAULT_SAVE]: " input_save
+    SAVE_NAME=${input_save:-"$DEFAULT_SAVE"}
+    
+    read -p "4. Nama fail output GGUF [$DEFAULT_GGUF]: " input_gguf
+    GGUF_NAME=${input_gguf:-"$DEFAULT_GGUF"}
+
+    read -p "5. Tahap Kuantisasi [Q4_K_M]: " input_quant
+    QUANT_METHOD=${input_quant:-"Q4_K_M"}
+
+    echo "--------------------------------------------------------"
+    echo "📝 Menjana fail .env di direktori semasa..."
+    
+    cat <<EOF > .env
+# Auto-generated .env file
+BASE_MODEL="$BASE_MODEL"
+ADAPTER_PATH="$CURRENT_DIR/$ADAPTER_NAME"
+SAVE_PATH="$CURRENT_DIR/$SAVE_NAME"
+GGUF_OUT="$CURRENT_DIR/$GGUF_NAME"
+QUANT_METHOD="$QUANT_METHOD"
+EOF
+    echo "✅ Fail .env berjaya dicipta secara automatik!"
 fi
 
-# 🎛️ CLI OVERRIDE (Fungsi QoL Baru)
-# Membenarkan pengguna menukar nilai .env secara "on-the-fly" melalui terminal
+# --------------------------------------
+# 2. BACA .ENV & CLI OVERRIDE
+# --------------------------------------
+source .env
+echo "✅ Fail .env sedia dibaca."
+
+# 🎛️ CLI OVERRIDE (Tukar setting on-the-fly)
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --quant) QUANT_METHOD="$2"; shift ;;
@@ -75,14 +118,14 @@ REQUIRED_VARS=(BASE_MODEL ADAPTER_PATH SAVE_PATH GGUF_OUT QUANT_METHOD)
 
 for var in "${REQUIRED_VARS[@]}"; do
     if [ -z "${!var:-}" ]; then
-        echo "❌ RALAT: Pemboleh ubah '$var' tidak ditetapkan!"
+        echo "❌ RALAT: Pemboleh ubah '$var' tidak ditetapkan dalam .env!"
         exit 1
     fi
 done
 echo "✅ Semua pemboleh ubah lengkap. (Kuantisasi: $QUANT_METHOD)"
 
 # --------------------------------------
-# 2. ANTI-OVERWRITE (Pelindung Model Lama)
+# 3. ANTI-OVERWRITE (Pelindung Model Lama)
 # --------------------------------------
 echo "🛡️ Memeriksa risiko 'overwrite'..."
 if [ -d "$SAVE_PATH" ]; then
@@ -190,20 +233,22 @@ fi
 
 echo "--------------------------------------"
 echo "📝 Langkah 4: Menjana Modelfile..."
+# Model Name untuk Ollama mestilah huruf kecil
+MODEL_NAME=$(basename "$GGUF_OUT" .gguf | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+
 cat <<EOF > Modelfile
 FROM $GGUF_OUT
 PARAMETER temperature 0.7
-SYSTEM "Anda adalah pembantu AI yang pakar dalam hal ehwal Malaysia. Jawab dalam Bahasa Melayu yang natural."
+SYSTEM "Anda adalah pembantu AI yang pintar. Sila bantu pengguna dengan tepat dan berbudi bahasa."
 EOF
 
 echo "--------------------------------------"
-MODEL_NAME=$(basename "$GGUF_OUT" .gguf | tr '[:upper:]' '[:lower:]' | tr '_' '-')
 echo "🤖 Langkah 5: Pendaftaran Ollama ($MODEL_NAME)..."
 ollama create "$MODEL_NAME" -f Modelfile
 
 echo "--------------------------------------"
 
-# ⏱️ KIRAAN MASA TAMAT (Fungsi QoL Baru)
+# ⏱️ KIRAAN MASA TAMAT
 DURATION=$(( SECONDS - START_TIME ))
 MINS=$(( DURATION / 60 ))
 SECS=$(( DURATION % 60 ))
